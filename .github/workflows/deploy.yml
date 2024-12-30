@@ -4,7 +4,7 @@ on:
   workflow_dispatch:  # Allows manual triggering
   push:
     branches:
-      - main  # or master, depending on your default branch
+      - master  # Changed to master since that's the default branch in your repo
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
@@ -33,6 +33,7 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
+          BASE_URL: /imgalign/
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4

@@ -12,3 +12,5 @@ npm run serve
 ```
 
 It won't work with the default openssl provider since the project was created with an older version of node.
+
+The GH Action just uses node 14, which has the legacy provider, so it works.
