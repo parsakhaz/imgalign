@@ -1,10 +1,12 @@
-
 // const CopyWebpackPlugin = require('copy-webpack-plugin')
 
 module.exports = {
   publicPath: process.env.NODE_ENV === 'production'
     ? '/imgalign/'
     : '/',
+  configureWebpack: {
+    devtool: 'source-map'
+  },
   pwa: {
     name: 'Image Needle',
     themeColor: '#000000',
