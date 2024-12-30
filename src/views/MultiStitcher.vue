@@ -180,6 +180,7 @@ export default {
     this.$store.dispatch('multiInput/init');
     this.$store.dispatch('worker/load');
     this.loadHistoryFromStorage();
+    this.loadGalleryFromStorage();
   },
   computed: {
     multiStitchName() {
@@ -264,13 +265,10 @@ export default {
     deleteResult() {
       this.$store.commit('worker/results/imageData', { name: multiStitchName, imageData: null });
     },
-    loadDefaultImages() {
-      this.$store.dispatch('multiInput/loadDefaultImages');
-      this.deleteWorkerData();
-    },
     deleteAllOrSelectedInputImages() {
       this.$store.dispatch('multiInput/removeAllOrSelected');
       this.deleteWorkerData();
+      this.saveGalleryToStorage();
     },
     swapImagesInputImages({ indexFrom, indexTo }) {
       this.$store.commit('multiInput/swap', { indexFrom, indexTo });
@@ -282,6 +280,7 @@ export default {
     async multiInputFilesChanged(files) {
       this.deleteWorkerData();
       await this.$store.dispatch('multiInput/imageFiles', files);
+      this.saveGalleryToStorage();
     },
     setFieldOfView(value) {
       this.selectedIndices.forEach(index => {
@@ -347,6 +346,28 @@ export default {
     deleteSelectedInputImages() {
       this.$store.dispatch('multiInput/removeAllOrSelected');
       this.deleteWorkerData();
+      this.saveGalleryToStorage();
+    },
+    loadGalleryFromStorage() {
+      try {
+        const storedGallery = localStorage.getItem('galleryImages');
+        if (storedGallery) {
+          const gallery = JSON.parse(storedGallery);
+          if (gallery.images && gallery.images.length > 0) {
+            this.$store.dispatch('multiInput/imageFiles', gallery.images);
+          }
+        }
+      } catch (err) {
+        this.$store.commit('logs/addErrorMessage', 'Failed to load gallery images');
+      }
+    },
+    saveGalleryToStorage() {
+      try {
+        const images = this.$store.getters['multiInput/imageDataArray'];
+        localStorage.setItem('galleryImages', JSON.stringify({ images }));
+      } catch (err) {
+        this.$store.commit('logs/addErrorMessage', 'Failed to save gallery images');
+      }
     }
   }
 }

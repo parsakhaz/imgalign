@@ -1,11 +1,6 @@
-
 import { ImageDataConversion } from '@/utilities/ImageDataConversion';
 import { paramTypes } from '@/models/constants/params';
 import { ExifHelper } from '@/utilities/ExifHelper';
-
-import defaultImage1 from '@/assets/ms1.jpg';
-import defaultImage2 from '@/assets/ms2.jpg';
-import defaultImage3 from '@/assets/ms3.jpg';
 
 const state = {
   imageDataArray: [],
@@ -17,7 +12,8 @@ const state = {
   busy: false,
   busyLoading: false,
   indicesSelected: [],
-  initCalled: false
+  initCalled: false,
+  error: null
 }
 
 const getters = {
@@ -66,6 +62,9 @@ const getters = {
   },
   initCalled(state) {
     return state.initCalled;
+  },
+  error(state) {
+    return state.error;
   }
 }
 
@@ -165,52 +164,27 @@ const mutations = {
   },
   initCalled(state) {
     state.initCalled = true;
+  },
+  setError(state, message) {
+    state.error = message;
   }
 }
 
 const actions = {
 
   loadDefaultImages(context) {
-    
     const ia = context.getters['imageDataArray'];
     if(ia && ia.length > 0) {
       context.commit('removeAll');
     }
-
-    const defaultImages = [defaultImage1, defaultImage2, defaultImage3];
-     
-    for(const defaultImage of defaultImages) {
-      
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const imageData = ImageDataConversion.imageDataFromImageSrc(img);
-
-          context.commit('imageData', imageData);
-          context.commit('_imageDataUrl', ImageDataConversion.imageSrcFromImageData(imageData));
-          context.commit('imageFieldOfView', 45);
-          context.commit('imageFieldOfViewInitial', 45);
-
-          img.onload = null;
-        }
-        finally {
-          context.commit('busy', false);
-        }
-      }
-      if(defaultImage) {
-        img.src = defaultImage;
-        context.commit('busy', true);
-      }
-    }
   },
 
   init(context) {
-
     if(context.getters['initCalled']) {
       return;
     }
     context.commit('initCalled');
-    context.dispatch('loadDefaultImages');
+    context.dispatch('loadFromStorage');
   },
 
   async imageData({ commit, dispatch, rootGetters }, imageData) {
@@ -295,6 +269,7 @@ const actions = {
 
           img.onload = null;
           URL.revokeObjectURL(img.src);
+          context.dispatch('saveToStorage');
         }
         finally {
           if(!wasBusy) context.commit('busy', false);
@@ -310,26 +285,22 @@ const actions = {
   async imageFiles(context, files) {
     try {
       context.commit('busy', true);
-
-      const localFiles = []
-      for(const file of files) {
-        localFiles.push(file);
-      }
+      const localFiles = Array.from(files);
       for(const file of localFiles) {
         await context.dispatch('imageFile', file);
       }
-    }
-    finally {
+      context.dispatch('saveToStorage');
+    } finally {
       context.commit('busy', false);
     }
   },
   removeAllOrSelected(context) {
     if(context.getters['indicesSelected'].length == 0) {
       context.commit('removeAll');
-    }
-    else {
+    } else {
       context.commit('removeSelected');
     }
+    context.dispatch('saveToStorage');
   },
 
   async reloadFilesFromDisc(context) {
@@ -347,6 +318,45 @@ const actions = {
       || context.getters['imageDataArray'][0] == null ) {
       
       await context.dispatch('reloadFilesFromDisc');
+    }
+  },
+
+  saveToStorage({ state, commit }) {
+    try {
+      const dataToSave = {
+        imageDataUrlsArray: state.imageDataUrlsArray,
+        imageFieldOfViewArray: state.imageFieldOfViewArray,
+        imageFieldOfViewInitialArray: state.imageFieldOfViewInitialArray
+      };
+      localStorage.setItem('multiInputState', JSON.stringify(dataToSave));
+    } catch (err) {
+      commit('setError', 'Failed to save images to storage');
+    }
+  },
+
+  loadFromStorage({ commit }) {
+    try {
+      const savedData = localStorage.getItem('multiInputState');
+      if (savedData) {
+        const { imageDataUrlsArray, imageFieldOfViewArray, imageFieldOfViewInitialArray } = JSON.parse(savedData);
+        
+        // Load each image from the saved URLs
+        if (imageDataUrlsArray && imageDataUrlsArray.length > 0) {
+          imageDataUrlsArray.forEach((dataUrl, index) => {
+            const img = new Image();
+            img.onload = () => {
+              const imageData = ImageDataConversion.imageDataFromImageSrc(img);
+              commit('imageData', imageData);
+              commit('_imageDataUrl', dataUrl);
+              commit('imageFieldOfView', imageFieldOfViewArray[index] || 45);
+              commit('imageFieldOfViewInitial', imageFieldOfViewInitialArray[index] || 45);
+            };
+            img.src = dataUrl;
+          });
+        }
+      }
+    } catch (err) {
+      commit('setError', 'Failed to load images from storage');
     }
   }
 
